@@ -1,0 +1,29 @@
+{
+  "name": "bookscan",
+  "private": true,
+  "version": "0.0.0",
+  "description": "안드로이드 크롬용 북스캔 웹앱 (정적 PWA)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:https": "vite --host --mode https",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "preview:lan": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.1"
+  }
+}

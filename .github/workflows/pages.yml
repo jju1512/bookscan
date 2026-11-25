@@ -1,0 +1,68 @@
+# 북스캔 웹앱 — 테스트·빌드 후 GitHub Pages 배포
+#
+# - 배포는 main 브랜치에 push 될 때와 수동 실행(workflow_dispatch)일 때만 한다. PR 은 테스트·빌드까지.
+# - 저장소 Settings → Pages → Source 가 "GitHub Actions" 여야 배포 단계가 성공한다.
+# - Vite base 는 configure-pages 가 알려 주는 Pages 하위 경로(/bookscan)를 쓴다.
+#   다른 값이 필요하면 저장소 변수 BOOKSCAN_BASE_PATH 를 만든다 (예: /, /bookscan/).
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # configure-pages 가 Pages 설정(base_path)을 읽는다. GitHub 공식 Pages 스타터와 같은 권한.
+      pages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Pages 설정 읽기
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
+      - name: 빌드
+        run: npm run build
+        env:
+          # PR 에서는 pages 단계가 없으므로 "/" 로 빌드된다.
+          BASE_PATH: ${{ vars.BOOKSCAN_BASE_PATH || format('{0}/', steps.pages.outputs.base_path) }}
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
