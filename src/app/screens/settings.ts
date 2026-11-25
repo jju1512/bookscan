@@ -59,6 +59,7 @@ export const settingsScreen: Screen = (ctx, _route, root) => {
         ...PROCESS_STEPS.map((step) => check(STEP_LABELS[step], s.steps[step], (v) => updateSettings({ steps: { ...getSettings().steps, [step]: v } }))),
         check('화질 보정에서 흑백(적응형 임계값)으로 바꾸기', s.enhanceBinarize, (v) => updateSettings({ enhanceBinarize: v }), '글자만 있는 책에 좋습니다. 그림이 많으면 끄세요.'),
         h('p', { class: 'muted small' }, '처리할 때 긴 변 최대 길이(PROCESS_MAX_EDGE, 기본 3000px)는 디버그 패널의 파라미터에서 바꿉니다.'),
+        h('p', {}, h('a', { href: `${import.meta.env.BASE_URL}debug/compare/`, class: 'btn btn-quiet' }, '후처리 비교 페이지 (/debug/compare)')),
       ),
       h(
         'section',

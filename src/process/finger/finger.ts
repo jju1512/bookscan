@@ -79,6 +79,7 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
     cv.bitwise_and(text, notSkin, text);
     notSkin.delete();
     const textBox = textBounds(text, W, H);
+    const textDensity = textBox ? cv.countNonZero(text) / (textBox.w * textBox.h) : 0;
 
     const n = cv.connectedComponentsWithStats(skin, labels, stats, cents, 8, cv.CV_32S);
     const minArea = W * H * 0.0008;
@@ -97,10 +98,12 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
       const touchesBand = x <= band * 0.25 || y <= band * 0.25 || x + w >= W - band * 0.25 || y + h >= H - band * 0.25;
       if (!touchesBand) continue;
       // 덩어리 둘레 고리에 글자 픽셀이 얼마나 있나
-      const ring = ringTextDensity(lab, i, text.data as Uint8Array, W, H, x, y, w, h, Math.max(4, Math.round(Math.min(W, H) * 0.012)));
-      const insideText = textBox && overlap(textBox, { x, y, w, h }) > 0.15 * w * h;
+      // 고리 반지름은 피부 마스크를 키운 폭(7px)보다 넉넉히: 그 안쪽은 글자 마스크에서 빠져 있다
+      const ring = ringTextDensity(lab, i, text.data as Uint8Array, W, H, x, y, w, h, Math.max(12, Math.round(Math.min(W, H) * 0.03)));
+      const insideText = textBox !== null && overlap(textBox, { x, y, w, h }) > 0.15 * w * h;
       let action: FingerRegion['action'];
-      if (ring > 0.06 && insideText) {
+      // 둘레의 글자 밀도가 본문 평균 밀도의 25% 이상이면 글자 줄이 손가락 밑으로 이어진다고 본다
+      if (insideText && ring > 0.25 * textDensity) {
         action = 'overText';
         overText = true;
       } else {

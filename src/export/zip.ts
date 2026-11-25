@@ -67,7 +67,8 @@ export async function exportBookZip(repo: Repo, bookId: string, onProgress?: Pro
       // 조각이 파일에 다 써질 때까지 기다려 메모리에 쌓이지 않게 한다
       await chain;
       if (failed) throw failed;
-      onProgress?.(++done, present.length);
+      done++;
+      onProgress?.(done, present.length);
     }
     zip.end();
     await finalWritten;
@@ -178,7 +179,8 @@ export async function importBookZip(repo: Repo, file: Blob, opts: ImportOptions 
         upload: { state: 'pending', attempts: 0 },
         ...(jc.manual ? { manual: true } : {}),
       });
-      o.onProgress?.(++done, sorted.length);
+      done++;
+      o.onProgress?.(done, sorted.length);
     }
     if (captures.length === 0) throw new Error('ZIP 안에 원본 이미지가 없습니다');
     const existing = await repo.getBook(json.book.id);

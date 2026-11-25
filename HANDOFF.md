@@ -61,6 +61,19 @@
 | 드라이브에서 불러온 책은 원래 책 ID 를 그대로 쓰고 촬영은 upload=done·driveFileId 로, 책 폴더 ID 도 이어 받는다 | 다시 올리지 않고, PC 에서 만든 PDF 가 같은 폴더에 들어가게. 두 기기가 같은 book.json 을 갱신하면 마지막에 쓴 쪽이 이긴다 |
 | resumable 조각 PUT 에도 Authorization 헤더를 붙인다 (coder 구현 그대로) | "매 요청 토큰". 조각 도중 만료되면 401 → 대기열이 재발급 후 다시 올린다 |
 | 401 이 새 토큰 이전 요청에서 늦게 오면 무시(토큰 세대), 재발급 10초 안에 또 401 이면 바로 "다시 연결" | 멀쩡한 새 토큰으로 "다시 연결"이 뜨거나 재발급이 무한 반복되는 것을 막는다 |
+| **(Phase 3)** OpenCV.js 는 `@techstark/opencv-js` 4.12(단일 스레드, WASM 내장 JS)를 `public/vendor/` 로 복사(`scripts/copy-vendor.mjs`, dev·build 전에 자동)해 같은 출처에서 module worker 가 fetch + 간접 eval 로 실행 | module worker 는 importScripts 를 못 쓴다. CDN 을 쓰지 않아야 오프라인·개인정보 조건을 지킨다. 서비스 워커가 설치 때 캐시(약 11MB, `maximumFileSizeToCacheInBytes` 12MB) |
+| Tesseract worker·코어(LSTM 전용 3종)·언어 데이터(kor/eng `4.0.0_best_int`)도 같은 출처 `vendor/` 에서. 사전 캐시하지 않고 처음 쓸 때 서비스 워커 CacheFirst + Tesseract 자체 IndexedDB 캐시 | 합계 약 16MB. 촬영만 하는 사용자에게 설치 때 받게 하지 않는다 |
+| 후처리 실행기는 메인 스레드(`src/process/runner.ts`), 이미지 단계는 process worker 하나, OCR 은 Tesseract 자체 worker. 한 번에 한 페이지·한 단계 | SPEC 8장. IndexedDB·OPFS 갱신을 한곳에서 하고, 단계 실행만 worker 로 |
+| 단계 결과가 입력과 같으면(손가락 없음, 펴기 건너뜀) 파일을 쓰지 않고 다음 단계는 앞 결과를 쓴다 | 저장 공간과 시간 절약 |
+| 펼침 책은 촬영마다 left/right 두 페이지가 각자 자르기 검출을 한다 (같은 결과) | 단순함. 검출은 수십 ms 라 부담이 작다 |
+| 자르기 실패: 원본(펼침이면 가운데 어두운 선으로만 나눔)을 그대로 결과로 쓰고 `failed` + `needsManual` → 목록에 표시, 다음 단계는 계속 | SPEC 8장 "원본을 유지하고 수동 보정 UI" |
+| 손가락: 피부색(YCrCb Cr 135~180, Cb 85~135) 덩어리 중 가장자리에 닿은 것만. 둘레(3%)의 글자 밀도가 본문 평균의 25% 이상이면 "글자를 덮음"(지우지 않고 표시), 글자 상자 밖이면 종이색 채움, 그 밖은 inpaint(Telea) | 합성 이미지로 맞춘 값. 실제 손가락·조명에서는 조정이 필요할 수 있다 |
+| 펴기(coder 구현): page_dewarp 의 "페이지 크기 추정 후 직사각형으로 리매핑" 대신 **곡면의 들림만 되돌려 입력과 같은 틀로** 그린다. 작업 해상도는 1280~300 중 줄이 가장 길게 잡히는 것. 최적화는 LM + 여러 시작점. 평평하면(이득 10% 미만 또는 최대 변위 0.5% 미만) 건너뜀, 결과가 나빠지면 건너뜀 | 자르기에서 이미 원근을 보정했으므로 원래 방식대로 다시 그리면 원근 왜곡이 생겼다(coder 가 눈으로 확인). SPEC 의 "3차 곡면 모델 → 최적화 → 리매핑" 자체는 지킨다 |
+| OCR 단어 좌표는 이미지 크기에 대한 비율(0~1)로 저장 | 단계마다 이미지 크기가 달라도 PDF 에 그대로 쓴다 |
+| PDF: 이미지 200dpi 환산 크기, 단어마다 렌더 모드 3(보이지 않음) + 가로 배율(Tz)로 상자 폭 맞춤, NanumGothic(OFL, `public/fonts/`) 서브셋 | SPEC 8장. 폰트 실패 시 이미지만 |
+| 책 전체 후처리가 끝나면 자동으로 PDF 를 만들고, 드라이브 연동 중이면 PDF 업로드 대기열에 넣는다 | SPEC 3장 데이터 흐름 5 |
+| 새로고침 뒤 이어서: 책 `processState='running'` 이면 후처리 화면을 열 때 자동으로 이어서 처리 (해시가 `#/process/<id>` 라 새로고침해도 그 화면으로 돌아온다) | SPEC 5장 Phase 3 완료 조건 |
+| `/debug/compare/` 는 Vite 다중 페이지 두 번째 입력(`debug/compare/index.html`). 내장 샘플은 `tests/fixtures/synthetic/*.png` 를 `vendor/samples/` 로 복사 | SPEC 8장 "비교 페이지(/debug/compare)". Pages 에서 실제 경로로 열린다 |
 
 ## 미결
 
@@ -77,3 +90,4 @@
 - 긴 heredoc(`cat > file <<'EOF'` 여러 개를 한 명령에)으로 파일을 쓰다 Git Bash 가 `unexpected EOF` 로 실패, 아무 파일도 안 써짐 → 파일 쓰기 도구로 바꿨다.
 - **`vite preview` 를 띄운 채 `npm ci`** → `EPERM unlink ...rolldown-binding.win32-x64-msvc.node` 로 실패하고 node_modules 가 반쯤 지워진다. 원인: preview 프로세스가 rolldown 네이티브 바인딩을 잡고 있음. `npx` 를 taskkill 해도 자식 `node vite.js preview` 가 남으므로 `Stop-Process -Id <그 PID>` 로 끄고 다시 `npm ci`.
 - **Emscripten(OpenCV.js) 모듈을 `await`** → 영원히 안 끝난다. 모듈이 then() 을 가진 thenable 이라 자기 자신으로 resolve 를 반복. `onRuntimeInitialized` 를 기다리고 then 을 지운다(`src/process/cvload.ts`).
+- **`fn?.(++n)` 로 진행 수를 세기** → 콜백이 없으면 `++n` 도 실행되지 않아 PDF 페이지 수가 0 으로 나왔다. 옵셔널 호출은 인자를 평가하지 않는다. 증가는 호출 밖에서 한다.

@@ -8,15 +8,18 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:https": "vite --host --mode https",
-    "build": "npm run typecheck && vite build",
+    "dev": "npm run vendor && vite",
+    "dev:https": "npm run vendor && vite --host --mode https",
+    "build": "npm run vendor && npm run typecheck && vite build",
     "preview": "vite preview",
     "preview:lan": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "vendor": "node scripts/copy-vendor.mjs",
+    "e2e:capture": "node scripts/e2e/capture.mjs",
+    "fixtures": "node tests/synthetic/generate.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

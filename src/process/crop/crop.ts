@@ -131,12 +131,20 @@ function largestQuad(cv: CV, bin: CV, imageArea: number, edgeMode: boolean): { p
       const pts = quadFromHull(cv, hull);
       c.delete();
       hull.delete();
+      if (pts && isWholeFrame(pts, bin.cols, bin.rows)) continue;
       if (pts && isConvex(orderCorners(pts)) && polygonArea(orderCorners(pts)) / imageArea >= MIN_AREA_RATIO) best = { pts, ratio };
     }
     return best;
   } finally {
     del(contours, hierarchy);
   }
+}
+
+/** 네 꼭짓점이 모두 이미지 모서리에 붙어 있으면(사진 테두리 자체) 책 외곽이 아니다 */
+function isWholeFrame(pts: Pt[], w: number, h: number): boolean {
+  const tol = Math.max(w, h) * 0.015;
+  const frame: Pt[] = [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]];
+  return frame.every((f) => pts.some((p) => Math.hypot(p[0] - f[0], p[1] - f[1]) <= tol));
 }
 
 /** 볼록 껍질을 4점으로 줄인다. approxPolyDP 의 허용 오차를 늘려 가며 시도하고, 안 되면 네 극점 */

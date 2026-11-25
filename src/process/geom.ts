@@ -103,3 +103,33 @@ export function smooth(values: ArrayLike<number>, radius: number): Float64Array 
   }
   return out;
 }
+
+/** 네 점 대응으로 호모그래피(3×3, 행 우선 9개)를 구한다. 풀 수 없으면 null */
+export function homography(src: Pt[], dst: Pt[]): number[] | null {
+  const A: number[][] = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = src[i]!;
+    const [u, v] = dst[i]!;
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y, u]);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y, v]);
+  }
+  // 가우스 소거 (부분 피벗)
+  for (let c = 0; c < 8; c++) {
+    let p = c;
+    for (let r = c + 1; r < 8; r++) if (Math.abs(A[r]![c]!) > Math.abs(A[p]![c]!)) p = r;
+    if (Math.abs(A[p]![c]!) < 1e-12) return null;
+    [A[c], A[p]] = [A[p]!, A[c]!];
+    for (let r = 0; r < 8; r++) {
+      if (r === c) continue;
+      const f = A[r]![c]! / A[c]![c]!;
+      for (let k = c; k < 9; k++) A[r]![k]! -= f * A[c]![k]!;
+    }
+  }
+  const h = A.map((row, i) => row[8]! / row[i]!);
+  return [...h, 1];
+}
+
+export function applyH(H: number[], p: Pt): Pt {
+  const d = H[6]! * p[0] + H[7]! * p[1] + H[8]!;
+  return [(H[0]! * p[0] + H[1]! * p[1] + H[2]!) / d, (H[3]! * p[0] + H[4]! * p[1] + H[5]!) / d];
+}

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
@@ -41,9 +42,21 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        // 앱 셸을 설치 시 캐시한다. OpenCV.js 는 Phase 1 에서 추가한다.
+        // 앱 셸과 OpenCV.js 를 설치 시 캐시한다 (SPEC 9장: 촬영·로컬 저장이 오프라인에서 동작).
+        // OCR(tesseract 코어·언어 데이터)·폰트·비교용 샘플은 크므로 처음 쓸 때 받아 캐시한다.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        globIgnores: ['vendor/tesseract/**', 'vendor/tessdata/**', 'vendor/samples/**', 'debug/**/*.png'],
+        // opencv.js 는 WASM 이 들어 있어 약 11MB
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        navigateFallbackDenylist: [/\/debug\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /\/vendor\/(tesseract|tessdata|samples)\/|\/fonts\//.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'bookscan-runtime-v1', expiration: { maxEntries: 40 } },
+          },
+        ],
       },
       devOptions: { enabled: false },
     }),
@@ -53,7 +66,15 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      // /debug/compare/ : 후처리 단계별 결과 비교 페이지 (SPEC 8장)
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        compare: fileURLToPath(new URL('./debug/compare/index.html', import.meta.url)),
+      },
+    },
   },
+  worker: { format: 'es' },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
