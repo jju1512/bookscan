@@ -180,8 +180,11 @@ export const processScreen: Screen = (ctx, route, root) => {
     void svc.start(bookId, { pageIds: [p.id], makePdf: false });
   };
 
+  let ensured = false;
   const refresh = async () => {
-    pages = await ctx.repo.ensurePages(bookId);
+    // ensurePages 는 처음 한 번만 (촬영이 바뀌면 처리 시작 때 runner 가 다시 맞춘다)
+    pages = ensured ? await ctx.repo.listPages(bookId) : await ctx.repo.ensurePages(bookId);
+    ensured = true;
     renderToggles();
     await renderControls();
     renderStatus();

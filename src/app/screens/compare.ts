@@ -112,7 +112,7 @@ export const compareScreen: Screen = (ctx, route, root) => {
         h('a', { class: 'btn', href: `#/compare/${encodeURIComponent(bookId)}` }, '전체 목록'),
       ),
       tabs,
-      h('div', { class: 'cmp-split' }, h('div', { class: 'cmp-side' }, h('h3', {}, '원본'), await img(cap?.file ?? cap?.thumb, '원본')), right),
+      h('div', { class: 'cmp-split' }, h('div', { class: 'cmp-side' }, h('h3', {}, '원본'), await img(cap && (await ctx.repo.files.exists(cap.file)) ? cap.file : cap?.thumb, '원본')), right),
       h(
         'ul',
         { class: 'notes muted small' },

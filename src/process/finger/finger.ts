@@ -24,6 +24,10 @@ export interface FingerRegion {
   h: number;
   area: number;
   action: 'filled' | 'inpainted' | 'overText';
+  /** 판정 근거: 둘레 글자 밀도, 본문 평균 밀도, 글자 상자와 겹친 비율 */
+  ring?: number;
+  textDensity?: number;
+  textOverlap?: number;
 }
 
 export interface FingerResult {
@@ -70,8 +74,10 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
     cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
     const block = oddAtLeast(Math.round(Math.min(W, H) / 40), 15);
     cv.adaptiveThreshold(gray, text, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, block, 15);
+    // 손가락 둘레의 그림자·외곽선도 글자로 세지 않도록 피부 마스크를 넉넉히 키워 뺀다 (짧은 변의 2.5%)
+    const skinPad = oddAtLeast(Math.round(Math.min(W, H) * 0.025), 15);
     const skinDil = new cv.Mat();
-    const kd = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(15, 15));
+    const kd = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(skinPad, skinPad));
     cv.dilate(skin, skinDil, kd);
     kd.delete();
     const notSkin = new cv.Mat();
@@ -94,16 +100,18 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
       const w = stats.intAt(i, cv.CC_STAT_WIDTH);
       const h = stats.intAt(i, cv.CC_STAT_HEIGHT);
       const area = stats.intAt(i, cv.CC_STAT_AREA);
-      if (area < minArea) continue;
+      // 페이지의 20% 넘는 덩어리는 손가락이 아니라 피부색에 가까운 종이·조명으로 본다
+      if (area < minArea || area > W * H * 0.2) continue;
       const touchesBand = x <= band * 0.25 || y <= band * 0.25 || x + w >= W - band * 0.25 || y + h >= H - band * 0.25;
       if (!touchesBand) continue;
       // 덩어리 둘레 고리에 글자 픽셀이 얼마나 있나
-      // 고리 반지름은 피부 마스크를 키운 폭(7px)보다 넉넉히: 그 안쪽은 글자 마스크에서 빠져 있다
-      const ring = ringTextDensity(lab, i, text.data as Uint8Array, W, H, x, y, w, h, Math.max(12, Math.round(Math.min(W, H) * 0.03)));
-      const insideText = textBox !== null && overlap(textBox, { x, y, w, h }) > 0.15 * w * h;
+      // 고리 반지름은 피부 마스크를 키운 폭(skinPad)보다 넉넉히: 그 안쪽은 글자 마스크에서 빠져 있다
+      const ring = ringTextDensity(lab, i, text.data as Uint8Array, W, H, x, y, w, h, Math.max(skinPad + 8, Math.round(Math.min(W, H) * 0.03)));
+      const textOverlap = textBox ? overlap(textBox, { x, y, w, h }) / (w * h) : 0;
+      const insideText = textOverlap > 0.15;
       let action: FingerRegion['action'];
-      // 둘레의 글자 밀도가 본문 평균 밀도의 25% 이상이면 글자 줄이 손가락 밑으로 이어진다고 본다
-      if (insideText && ring > 0.25 * textDensity) {
+      // 글자 상자와 겹치고 둘레의 글자 밀도가 본문 평균 밀도의 15% 이상이면 글자 줄이 손가락 밑으로 이어진다고 본다
+      if (insideText && ring > 0.15 * textDensity) {
         action = 'overText';
         overText = true;
       } else {
@@ -113,7 +121,7 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
         for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (lab[yy * W + xx] === i) td[yy * W + xx] = 255;
         changed = true;
       }
-      regions.push({ x, y, w, h, area, action });
+      regions.push({ x, y, w, h, area, action, ring: round3(ring), textDensity: round3(textDensity), textOverlap: round3(textOverlap) });
     }
 
     let out = rgb;
@@ -142,6 +150,10 @@ export function removeFingers(cv: CV, src: Raster, opts: FingerOptions = {}): Fi
   }
 }
 
+function round3(v: number): number {
+  return Math.round(v * 1000) / 1000;
+}
+
 function oddAtLeast(v: number, min: number): number {
   const x = Math.max(min, v);
   return x % 2 ? x : x + 1;
@@ -155,8 +167,11 @@ function textBounds(text: { data: Uint8Array }, W: number, H: number): Box | nul
   const cols = new Float64Array(W);
   const d = text.data;
   let total = 0;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
+  // 가장자리 3% 는 뺀다: 자르기 경계의 책상·종이 테두리·책등 그림자가 긴 "글자"로 잡힌다
+  const ex = Math.round(W * 0.03);
+  const ey = Math.round(H * 0.03);
+  for (let y = ey; y < H - ey; y++) {
+    for (let x = ex; x < W - ex; x++) {
       if (d[y * W + x]) {
         rows[y]!++;
         cols[x]!++;
@@ -166,7 +181,7 @@ function textBounds(text: { data: Uint8Array }, W: number, H: number): Box | nul
   }
   if (total < W * H * 0.002) return null;
   const range = (arr: Float64Array, len: number, other: number) => {
-    const th = other * 0.01;
+    const th = other * 0.02;
     let a = 0;
     while (a < len && arr[a]! <= th) a++;
     let b = len - 1;

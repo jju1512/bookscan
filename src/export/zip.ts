@@ -25,7 +25,8 @@ export async function exportBookZip(repo: Repo, bookId: string, onProgress?: Pro
   const pages = await repo.listPages(bookId);
   const name = zipFileName(book);
   const path = paths.exportFile(bookId, name);
-  await repo.files.removeDir(`${paths.bookDir(bookId)}/export`).catch(() => {});
+  // 같은 이름의 이전 ZIP 만 지운다 (export/ 의 PDF 는 남긴다 — 드라이브 업로드 대기 중일 수 있다)
+  await repo.files.remove(path).catch(() => {});
   const writer = await repo.files.openWriter(path);
 
   let chain: Promise<void> = Promise.resolve();

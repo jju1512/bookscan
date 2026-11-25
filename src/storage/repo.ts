@@ -316,6 +316,7 @@ export class Repo {
     for (const p of existing) byCap.set(p.captureId, [...(byCap.get(p.captureId) ?? []), p]);
     const sides: Page['side'][] = book.captureMode === 'spread' ? ['left', 'right'] : ['single'];
     const keep = new Set<string>();
+    let changed = false;
     for (const c of caps) {
       const have = byCap.get(c.id) ?? [];
       for (const side of sides) {
@@ -323,9 +324,11 @@ export class Repo {
         if (!p) {
           p = { id: this.newId(), bookId, captureId: c.id, side, order: pageOrder(c.order, side), steps: emptySteps(), files: {} };
           await tx.store.add(p);
+          changed = true;
         } else if (p.order !== pageOrder(c.order, side)) {
           p = { ...p, order: pageOrder(c.order, side) };
           await tx.store.put(p);
+          changed = true;
         }
         keep.add(p.id);
       }
@@ -339,7 +342,8 @@ export class Repo {
     }
     await tx.done;
     for (const p of removed) await this.files.removeDir(paths.pageDir(bookId, p.id));
-    this.emit({ type: 'pages', bookId });
+    // 바뀐 것이 없으면 알리지 않는다 (화면이 이 이벤트로 다시 ensurePages 를 부르면 끝없이 돈다)
+    if (changed || removed.length) this.emit({ type: 'pages', bookId });
     return this.listPages(bookId);
   }
 

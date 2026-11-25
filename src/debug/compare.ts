@@ -23,7 +23,7 @@ const base = import.meta.env.BASE_URL;
 
 const app = document.getElementById('app')!;
 const table = h('div', { class: 'dbg-cmp' });
-const status = h('p', { class: 'muted' });
+const status = h('p', { class: 'muted', id: 'status', 'aria-live': 'polite' });
 const ocrBox = h('input', { type: 'checkbox' });
 const modeSel = h('select', { class: 'input input-inline' }, h('option', { value: 'auto' }, '촬영 단위: 이름으로 (spread-*)'), h('option', { value: 'spread' }, '양쪽 펼침'), h('option', { value: 'single' }, '한 페이지'));
 const fileInput = h('input', { type: 'file', accept: 'image/*', multiple: true });

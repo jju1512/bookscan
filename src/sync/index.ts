@@ -57,7 +57,11 @@ export function createSync(opts: SyncOptions): SyncApi {
   });
   token.onChange(notify);
 
-  const onlineChange = () => queue.setOnline(navigator.onLine);
+  const onlineChange = () => {
+    queue.setOnline(navigator.onLine);
+    // 오프라인 동안 실패해 백오프(최대 5분) 중인 것은 온라인이 되면 바로 다시 시도한다
+    if (navigator.onLine && getSettings().driveEnabled) void api.retryFailed();
+  };
   window.addEventListener('online', onlineChange);
   window.addEventListener('offline', onlineChange);
   queue.setOnline(navigator.onLine);

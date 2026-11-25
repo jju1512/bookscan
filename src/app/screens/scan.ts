@@ -137,6 +137,7 @@ export const scanScreen: Screen = (ctx, route, root) => {
       if (!cameraBox.isConnected) root.append(cameraBox);
       await video.play().catch((e: unknown) => log.warn('video.play 실패', e));
       await waitForVideo(video);
+      if (disposed) return void stopStream(opened.stream);
       const snap = await snapshotCamera(opened, video);
       res.textContent = summaryLine(snap);
       ctx.debug.setCamera(snap);
@@ -160,11 +161,19 @@ export const scanScreen: Screen = (ctx, route, root) => {
       } else if (!userPaused) {
         session.resume();
       }
+      // 기다리는 사이 화면을 나갔으면 세션을 붙이지 않는다 (worker·타이머·Wake Lock 누수 방지)
+      if (disposed) {
+        session?.dispose();
+        session = null;
+        stopStream(opened.stream);
+        return;
+      }
       session.attach(video, new Shooter(opened, video, () => getSettings().captureMethod));
       if (userPaused) session.pause();
       setState(session.current.name);
       ctx.debug.capture.setVideo(video);
       await wake.acquire();
+      if (disposed) await wake.release();
     } catch (err) {
       log.error('카메라 열기 실패', err);
       showMessage(describeCameraError(err));

@@ -51,6 +51,8 @@ export class CaptureSession {
   private lastSample: Sample | null = null;
   private shooter: Shooter | null = null;
   private video: HTMLVideoElement | null = null;
+  /** 사용자가 일시정지를 눌렀다 (촬영 중에 눌러도 저장이 끝나면 PAUSED 로 간다) */
+  private userPaused = false;
   /** 재촬영할 촬영 ID (한 장 찍으면 끝) */
   replaceCaptureId?: string;
 
@@ -115,10 +117,12 @@ export class CaptureSession {
   }
 
   pause(): void {
-    this.apply(pause(this.state, this.now()));
+    this.userPaused = true;
+    if (this.state.name !== 'CAPTURE') this.apply(pause(this.state, this.now()));
   }
 
   resume(): void {
+    this.userPaused = false;
     this.analyzer.resetMotion();
     this.apply(resume(this.state, this.now()));
   }
@@ -211,12 +215,12 @@ export class CaptureSession {
       );
       log.info(`촬영 저장 #${saved.seq} ${saved.width}×${saved.height} ${shot.method} ${Math.round(shot.ms)}ms`);
       this.replaceCaptureId = undefined;
-      this.apply(captured(this.state, this.now(), sharpness, { wasPaused }));
+      this.apply(captured(this.state, this.now(), sharpness, { wasPaused: wasPaused || this.userPaused }));
       this.events.onCaptured?.(saved, shot);
     } catch (e) {
       log.error('촬영 또는 저장 실패', e);
       this.apply(captureFailed(this.state, this.now()));
-      if (wasPaused) this.apply(pause(this.state, this.now()));
+      if (wasPaused || this.userPaused) this.apply(pause(this.state, this.now()));
       this.events.onCaptureError?.(e);
     } finally {
       this.capturing = false;

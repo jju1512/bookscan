@@ -25,7 +25,9 @@ export const bookScreen: Screen = (ctx, route, root) => {
   let caps: Capture[] = [];
   let pages: Page[] = [];
 
+  let renderSeq = 0;
   const render = async () => {
+    const seq = ++renderSeq;
     book = await ctx.repo.getBook(bookId);
     if (!book) {
       clear(head);
@@ -34,12 +36,13 @@ export const bookScreen: Screen = (ctx, route, root) => {
     }
     caps = await ctx.repo.listCaptures(bookId);
     pages = await ctx.repo.listPages(bookId);
+    if (seq !== renderSeq) return;
     renderHead(book);
     renderActions(book);
     const bytes = caps.reduce((s, c) => s + c.bytes, 0);
     const uploaded = caps.filter((c) => c.upload.state === 'done').length;
     info.textContent = `${caps.length}장 · ${formatBytes(bytes)} · ${book.captureMode === 'spread' ? '양쪽 펼침' : '한 페이지'}${ctx.sync.configured && getSettings().driveEnabled ? ` · 드라이브 ${uploaded}/${caps.length}` : ''}`;
-    await renderGrid();
+    await renderGrid(seq);
   };
 
   const renderHead = (b: Book) => {
@@ -116,7 +119,7 @@ export const bookScreen: Screen = (ctx, route, root) => {
     ctx.go({ name: 'books' });
   };
 
-  const renderGrid = async () => {
+  const renderGrid = async (seq: number) => {
     urls.forEach((u) => URL.revokeObjectURL(u));
     urls = [];
     clear(grid);
@@ -126,6 +129,7 @@ export const bookScreen: Screen = (ctx, route, root) => {
     }
     for (const [i, c] of caps.entries()) {
       const blob = await ctx.repo.files.read(c.thumb);
+      if (seq !== renderSeq) return; // 더 새 렌더가 시작됐다 (중복 카드 방지)
       const { img } = blobImg(blob, { alt: `${i + 1}번째 촬영`, loading: 'lazy' });
       if (img.src) urls.push(img.src);
       const myPages = pages.filter((p) => p.captureId === c.id);

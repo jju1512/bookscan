@@ -129,7 +129,11 @@ export class ProcessRunner {
       for (const p0 of work) {
         let page = (await repo.getPage(p0.id))!;
         for (const step of PROCESS_STEPS) {
-          if (this.stopRequested) return false;
+          if (this.stopRequested) {
+            // 사용자가 멈췄다: 다음에 화면을 열어도 저절로 이어서 하지 않는다 (새로고침으로 끊긴 것과 구분)
+            await repo.updateBook(bookId, { processState: 'idle' }, false);
+            return false;
+          }
           const st = page.steps[step];
           if (st !== 'pending' && st !== 'running') {
             stepsDone++;
@@ -187,6 +191,11 @@ export class ProcessRunner {
       return repo.saveStepResult(page.id, step, outcome.state, { image: r.image ?? undefined, note: outcome.note, durationMs: ms, patch });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if ((e as { fatal?: boolean } | null)?.fatal) {
+        // 엔진을 쓸 수 없다: 이 페이지를 실패로 굳히지 않고 되돌린 뒤 실행을 멈춘다
+        await repo.updatePage(page.id, (p) => ({ ...p, steps: { ...p.steps, [step]: 'pending' } }));
+        throw e;
+      }
       this.log('error', `${step} 실패 (페이지 ${page.order})`, msg);
       const patch: Partial<Page> = step === 'crop' ? { needsManual: true } : {};
       // 자르기가 실패하면 원본을 그대로 다음 단계에 넘긴다 (원본 유지 + 수동 보정)

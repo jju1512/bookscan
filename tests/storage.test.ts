@@ -147,8 +147,14 @@ describe('후처리 페이지 상태', () => {
     const one = await repo.createBook({ title: '한쪽', captureMode: 'single' });
     await repo.addCapture(one.id, shot(1));
     expect((await repo.ensurePages(one.id)).map((p) => p.side)).toEqual(['single']);
-    // 두 번 불러도 늘어나지 않는다
+    // 두 번 불러도 늘어나지 않고, 바뀐 것이 없으면 이벤트도 내지 않는다 (화면 무한 갱신 방지)
+    let events = 0;
+    const off = repo.subscribe((e) => {
+      if (e.type === 'pages') events++;
+    });
     expect(await repo.ensurePages(one.id)).toHaveLength(1);
+    expect(events).toBe(0);
+    off();
   });
 
   it('단계 결과는 파일을 쓴 뒤 상태를 바꾸고, resetPageSteps 는 그 단계부터 되돌린다', async () => {

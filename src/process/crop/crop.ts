@@ -170,10 +170,13 @@ export function warpQuad(cv: CV, src: Raster, quad: [Pt, Pt, Pt, Pt]): Raster {
   const { width, height } = warpSize(quad);
   const m = rasterToMat(cv, src);
   const dst = new cv.Mat();
-  const from = cv.matFromArray(4, 1, cv.CV_32FC2, quad.flat());
-  const to = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
-  const M = cv.getPerspectiveTransform(from, to);
+  let from: CV = null;
+  let to: CV = null;
+  let M: CV = null;
   try {
+    from = cv.matFromArray(4, 1, cv.CV_32FC2, quad.flat());
+    to = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
+    M = cv.getPerspectiveTransform(from, to);
     cv.warpPerspective(m, dst, M, new cv.Size(width, height), cv.INTER_LINEAR, cv.BORDER_REPLICATE, new cv.Scalar());
     return matToRaster(cv, dst);
   } finally {

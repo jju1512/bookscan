@@ -83,7 +83,8 @@ describe('후처리 실행기', () => {
       if (k === 6) runner.stop();
     };
     expect(await runner.run(book.id)).toBe(false);
-    expect((await repo.getBook(book.id))!.processState).toBe('running');
+    // 사용자가 멈춘 것은 idle (화면을 다시 열어도 저절로 이어서 하지 않는다). 새로고침으로 끊기면 running 이 남는다
+    expect((await repo.getBook(book.id))!.processState).toBe('idle');
     // 새로고침: DB 를 다시 열고 recover
     const repo2 = new Repo(await openBookscanDB(`test-runner-${n}`), files, () => 2000, () => `q${n}-${Math.random()}`);
     await repo2.recover();
@@ -136,6 +137,18 @@ describe('후처리 실행기', () => {
     expect(p!.steps.ocr).toBe('failed');
     expect(p!.ocr).toBeUndefined();
     expect(finalImagePath(p!)).toBe(p!.files.crop);
+  });
+
+  it('엔진 오류(OpenCV 못 불러옴·worker 죽음)면 페이지를 실패로 굳히지 않고 멈춘다', async () => {
+    const { repo, book } = await setup(1, 'single');
+    const exec = new FakeExec();
+    exec.runImageStep = async () => {
+      throw Object.assign(new Error('OpenCV.js 를 불러오지 못했습니다'), { fatal: true });
+    };
+    await expect(new ProcessRunner({ repo, executor: exec, ocr: fakeOcr, settings: () => allOn }).run(book.id)).rejects.toThrow('OpenCV');
+    const [p] = await repo.listPages(book.id);
+    expect(p!.steps.crop).toBe('pending');
+    expect(p!.needsManual).toBeUndefined();
   });
 
   it('결과 나쁜 페이지만 다시 처리 (resetPageSteps + pageIds)', async () => {

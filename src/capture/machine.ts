@@ -175,7 +175,7 @@ export function captured(state: MachineState, t: number, sharpness: number, opts
     lastCaptureAt: t,
     captures: state.captures + 1,
     firstShot: false,
-    sharpHistory: [...state.sharpHistory, sharpness].slice(-SHARP_HISTORY),
+    sharpHistory: sharpness > 0 ? [...state.sharpHistory, sharpness].slice(-SHARP_HISTORY) : state.sharpHistory,
     stillSince: null,
     moveSince: null,
   };
@@ -183,10 +183,14 @@ export function captured(state: MachineState, t: number, sharpness: number, opts
   return { state: go(base, to, t, '저장 완료', transitions), capture: false, transitions };
 }
 
-/** 촬영이나 저장에 실패했다 → WAIT_STABLE (같은 장면을 다시 찍을 수 있게) */
+/**
+ * 촬영이나 저장에 실패했다 → WAIT_STABLE.
+ * 기준 프레임은 촬영 결정 때 이미 이 장면으로 바뀌었으므로, 다음 CHECK 는 change 없이 찍게(firstShot) 한다.
+ * 그러지 않으면 "같은 장면"으로 보고 이 페이지를 조용히 건너뛴다.
+ */
 export function captureFailed(state: MachineState, t: number): StepResult {
   const transitions: Transition[] = [];
-  return { state: go({ ...state, stillSince: null, moveSince: null }, 'WAIT_STABLE', t, '촬영 실패', transitions), capture: false, transitions };
+  return { state: go({ ...state, firstShot: true, stillSince: null, moveSince: null }, 'WAIT_STABLE', t, '촬영 실패', transitions), capture: false, transitions };
 }
 
 export function pause(state: MachineState, t: number, reason = '일시정지'): StepResult {

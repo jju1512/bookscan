@@ -173,6 +173,18 @@ describe('상태 전환 (SPEC 6장 표)', () => {
     expect(captureFailed(s, 60).state.name).toBe('WAIT_STABLE');
   });
 
+  it('촬영·저장이 실패하면 같은 장면이라도 다시 안정되면 찍는다 (조용한 누락 방지)', () => {
+    let s: MachineState = { ...initialState(), firstShot: false, name: 'CAPTURE', lastCaptureAt: 0 };
+    s = captureFailed(s, 100).state;
+    s = step(s, { t: 200, motion: 0, change: 0.001, sharpness: 1 }, P).state;
+    const r = step(s, { t: 600, motion: 0, change: 0.001, sharpness: 1 }, P);
+    expect(r.capture).toBe(true);
+  });
+
+  it('선명도 0(값 없음)은 기록에 넣지 않는다', () => {
+    expect(captured(manualCapture(initialState(), 0).state, 10, 0).state.sharpHistory).toEqual([]);
+  });
+
   it('PAUSED: 프레임 무시, 재개하면 WAIT_STABLE', () => {
     let s = pause(initialState(), 0).state;
     expect(s.name).toBe('PAUSED');

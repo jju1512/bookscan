@@ -63,18 +63,22 @@ try {
 
   // 후처리 시작
   await page.goto(`${url}#/process/${encodeURIComponent(bookId)}`, { waitUntil: 'networkidle0' });
-  await page.waitForSelector('.head-actions .btn-primary');
+  // 해시만 바뀌면 화면 교체가 비동기라, 후처리 화면이 그려진 뒤의 버튼을 누른다
+  await page.waitForSelector('.screen-process .page-row');
   const t0 = Date.now();
-  await page.click('.head-actions .btn-primary');
+  await page.click('.screen-process .head-actions .btn-primary');
 
   // 페이지 n쪽이 끝나면 새로고침 (중간 이어 하기 확인)
   // 진행: 후처리 화면의 단계 배지(완료·건너뜀·실패)를 센다
+  const withTimeout = (p, ms, label) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${label} 시간 초과`)), ms))]);
   const doneCount = () =>
-    page.evaluate(() => {
+    withTimeout(page.evaluate(() => {
       const all = [...document.querySelectorAll('.page-row .chips .badge')];
       const fin = all.filter((b) => /badge-(done|skipped|failed)/.test(b.className)).length;
       return { pages: document.querySelectorAll('.page-row').length, finished: fin, total: all.length, states: [...document.querySelectorAll('.page-row')].map((r) => r.querySelector('.page-info')?.innerText.split(String.fromCharCode(10)).join(' | ')) };
-    });
+    }), 10_000, 'doneCount');
+  await sleep(1500);
+  console.error('화면:', (await page.evaluate(() => location.hash + ' ' + (document.querySelector('#screen')?.innerText ?? '').slice(0, 300))).split(String.fromCharCode(10)).join(' / '));
   let st;
   for (;;) {
     await sleep(1000);

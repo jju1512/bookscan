@@ -141,6 +141,13 @@ describe('손가락 지우기', () => {
     expect(flagged).toBe(true);
   });
 
+  it('자동 자르기 결과에서도: 여백 손가락은 "덮음"으로 잘못 표시하지 않고, 글자 위 손가락은 표시한다', () => {
+    const flags = (name: string) =>
+      (['left', 'right'] as const).map((side) => removeFingers(cv, cropPage(cv, fixture(name).raster, { side }).raster).overText);
+    expect(flags('spread-finger-margin')).toEqual([false, false]);
+    expect(flags('spread-finger-text')).toContain(true);
+  });
+
   it('손가락이 없으면 바꾸지 않는다', () => {
     const r = removeFingers(cv, truthPage('spread-flat', 0));
     expect(r.changed).toBe(false);

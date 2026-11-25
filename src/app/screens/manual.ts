@@ -25,6 +25,16 @@ export const manualScreen: Screen = (ctx, route, root) => {
   const actions = h('div', { class: 'row-actions wrap' });
   root.append(h('section', { class: 'page' }, h('header', { class: 'page-head' }, h('h1', {}, '수동 보정')), info, box, actions));
   let url = '';
+  /** 처리 중이면 시작하지 못한다 → 그렇다고 알린다 (조용히 무시하지 않는다) */
+  const startOrTell = (bookId: string, pageIds: string[], okMsg: string) => {
+    const svc = processService(ctx.repo);
+    if (svc.state.running) {
+      toast('보정값을 저장했습니다. 지금 다른 처리가 진행 중이라, 끝난 뒤 후처리 화면에서 "이어서 처리"를 누르세요.', 'info', 6000);
+      return;
+    }
+    toast(okMsg, 'ok');
+    void svc.start(bookId, { pageIds, makePdf: false });
+  };
 
   void (async () => {
     const page = await ctx.repo.getPage(route.pageId);
@@ -128,8 +138,7 @@ export const manualScreen: Screen = (ctx, route, root) => {
         await ctx.repo.updatePage(sp.id, (p: Page) => ({ ...p, manual: { corners: norm, ...(spread ? { splitX: split } : {}) } }));
         await ctx.repo.resetPageSteps(sp.id, 'crop');
       }
-      toast('보정값을 저장했습니다. 이 촬영을 다시 처리합니다.', 'ok');
-      void processService(ctx.repo).start(page.bookId, { pageIds: siblings.map((s) => s.id), makePdf: false });
+      startOrTell(page.bookId, siblings.map((s) => s.id), '보정값을 저장했습니다. 이 촬영을 다시 처리합니다.');
       ctx.go({ name: 'compare', bookId: page.bookId, pageId: page.id });
     };
     const resetAuto = async () => {
@@ -142,8 +151,7 @@ export const manualScreen: Screen = (ctx, route, root) => {
         });
         await ctx.repo.resetPageSteps(sp.id, 'crop');
       }
-      toast('자동 검출로 되돌렸습니다. 다시 처리합니다.', 'ok');
-      void processService(ctx.repo).start(page.bookId, { pageIds: siblings.map((s) => s.id), makePdf: false });
+      startOrTell(page.bookId, siblings.map((s) => s.id), '자동 검출로 되돌렸습니다. 다시 처리합니다.');
       ctx.go({ name: 'process', bookId: page.bookId });
     };
     clear(actions);
