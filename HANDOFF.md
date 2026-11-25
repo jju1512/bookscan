@@ -8,10 +8,10 @@
 - 작업 브랜치 `ikju1223/phase1-3` (Orca worktree `C:\Users\stam\orca\workspaces\bookscan\phase1-3`). Phase 마다 build·test 통과 시 커밋하고 `git push origin HEAD:main` + 태그 `phase-N`.
 - 진행 상황
   - Phase 1: 저장(`src/storage/`), 상태 머신·분석(`src/capture/`), 촬영(`src/camera/shoot.ts`), 화면(`src/app/screens/`), ZIP(`src/export/zip.ts`), 디버그 그래프·녹화·재생.
-  - Phase 1 커밋 `d3268d3`(태그 phase-1), Actions 실행 45556908010 성공. 헤드리스: 합성 넘김 영상 5페이지 → 5장, 촬영 중 새로고침 뒤 모두 남음, 탭 수동 촬영 정상 (`scripts/e2e/capture.mjs`).
+  - Phase 1 커밋 `d3268d3`(태그 phase-1), Actions 실행 45556908010 성공. 헤드리스: 합성 넘김 영상(5페이지) 11초 → 자동 5장, 촬영 중 새로고침 뒤 5장 모두 남음(다시 열린 카메라가 영상 처음부터 재생해 1페이지가 마지막 촬영과 달라 1장 더 찍혀 6장 — 정상), 탭 수동 촬영으로 7장, 썸네일 7개 (`scripts/e2e/capture.mjs`).
   - Phase 2: 드라이브 클라이언트·대기열·토큰(`src/sync/`), 화면 연결(`src/sync/index.ts`), 온보딩, 다른 기기에서 불러오기(`src/sync/importer.ts`). 헤드리스로 ID 없음/있음 화면 확인 (`scripts/e2e/drive-ui.mjs`). 실제 구글 로그인은 사용자 Cloud 설정 뒤에만 검증된다.
   - Phase 2 커밋 `c0d920e`(태그 phase-2), Actions 성공.
-  - Phase 3: 자르기·분할, 손가락, 펴기(page-dewarp 방식, JS LM), 화질 보정, OCR(Tesseract kor+eng), 검색 가능한 PDF, 실행기·서비스, 후처리·수동 보정·전후 비교 화면, `/debug/compare/`. 헤드리스: ZIP 가져오기 → 처리 도중 새로고침(떠나기 경고 1회) → 자동으로 이어서 → PDF 4쪽, pdf.js 로 한글 단어 184개 중 178개 검색됨 (`scripts/e2e/process.mjs`). 커밋·태그는 이 파일 아래 "Phase 3 마무리" 참고.
+  - Phase 3: 자르기·분할, 손가락, 펴기(page-dewarp 방식, JS LM), 화질 보정, OCR(Tesseract kor+eng), 검색 가능한 PDF, 실행기·서비스, 후처리·수동 보정·전후 비교 화면, `/debug/compare/`. 헤드리스: ZIP 가져오기 → 처리 도중 새로고침(떠나기 경고 1회) → 자동으로 이어서 → PDF 4쪽, 새로고침 포함 약 14초, pdf.js 로 한글 단어 184개 중 178개 검색됨 (`scripts/e2e/process.mjs`). 커밋·태그는 이 파일 아래 "Phase 3 마무리" 참고.
   - 독립 검토(reviewer)에서 나온 결함(후처리 화면 무한 갱신, 촬영 실패 뒤 조용한 누락, 책 화면 중복 카드, 촬영 화면 빨리 나가면 worker·Wake Lock 누수, worker 죽으면 멈춤, "멈춤" 뒤 자동 재시작, 큰 피부색 덩어리, ZIP 내보내기가 PDF 를 지움 등)을 고쳤다.
   - **사용자 실기기 확인 전.** 다음 할 일: 사용자 체크리스트 결과를 받아 파라미터·손가락·펴기 값을 조정하고, 사용자 샘플(실제 책 사진 30장 내외·넘김 녹화)을 `tests/fixtures/` 에 넣어 회귀 기준을 다시 잡는다.
   - 합성 테스트 데이터 생성기 `tests/synthetic/*.ts` 와 `tests/fixtures/synthetic/*` 생성됨.
@@ -105,8 +105,11 @@
 
 ## Phase 3 마무리 · 알려진 한계
 
+- 커밋: WIP `a885df2` → 최종 `2f9481a`(태그 phase-3), main push, Actions 실행 45591244272 성공. 배포 주소의 앱·`/debug/compare/`·`vendor/`(OpenCV·Tesseract·언어 데이터)·폰트 200 확인.
+- 검토 결함 중 고치지 않은 것: 낮음-2(아래), 낮음-5 설정 화면이 업로드 상태가 바뀔 때마다 전체를 다시 그림(입력 중이 아니면 눈에 띄는 문제 없음), 중간-I 300쪽 PDF 메모리(아래, 실기기 확인 몫).
+
 - 펴기: 합성 이미지에서 줄 곧음 약 25~34% 개선. 3차 곡면이 심한 종 모양 휨을 다 못 따라가고, 페이지 기울기(deskew)는 하지 않는다. 실제 사진 미확인.
-- OCR: 합성 페이지는 정답 단어 70% 넘게 읽는다. 실제 책·휴대폰 속도는 측정하지 않았다 (PC 헤드리스 크롬에서 약 700×960px 합성 페이지 4쪽의 전체 단계가 약 10초 — OCR 만 따로 재지는 않았다).
+- OCR: 합성 페이지는 정답 단어 70% 넘게 읽는다. 실제 책·휴대폰 속도는 측정하지 않았다 (PC 헤드리스 크롬에서 약 700×960px 합성 페이지 4쪽의 전체 단계가 앱 로그 기준 10초, 중간 새로고침 포함 14초 — OCR 만 따로 재지는 않았다).
 - 메모리: 한 번에 한 페이지, 긴 변 3000px. PDF 는 pdf-lib 로 메모리에서 만들어 300쪽이면 수백 MB 가 필요할 수 있다 — 휴대폰 300쪽 완주는 미검증(Phase 3 완료 조건 중 실기기 몫).
 - 손가락 판정 값(YCrCb 범위, 덩어리 면적 0.08%~20%, 덮음 판정)은 합성 이미지 기준.
 - 연동 해제 중에 진행 중이던 업로드가 401 을 받으면 팝업 없는 재발급을 한 번 시도할 수 있다 (reviewer 낮음-2, 고치지 않음: 대기열은 이미 멈춰 새 업로드는 없다).
