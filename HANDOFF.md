@@ -2,9 +2,20 @@
 
 새 작업은 이 파일을 먼저 읽는다. 요구사항 기준은 [docs/SPEC.md](docs/SPEC.md).
 
-## 지금 상태 (2026-11-25)
+## 지금 상태 (2026-11-25, Phase 1~3 작업 중)
 
-- **Phase 0 구현 완료, 사용자 실기기 확인 대기.** Phase 1 은 시작하지 않았다 (SPEC 5장: Phase 마다 실기기 확인 후 진행).
+- **사용자 결정: Phase 1·2·3 을 이어서 한 번에 구현** (SPEC 5장과 다름 — 실기기 확인은 끝난 뒤 사용자가 몰아서 한다). AI(Phase 4) 는 보류.
+- 작업 브랜치 `ikju1223/phase1-3` (Orca worktree `C:\Users\stam\orca\workspaces\bookscan\phase1-3`). Phase 마다 build·test 통과 시 커밋하고 `git push origin HEAD:main` + 태그 `phase-N`.
+- 진행 상황
+  - Phase 1: 저장(`src/storage/`), 상태 머신·분석(`src/capture/`), 촬영(`src/camera/shoot.ts`), 화면(`src/app/screens/`), ZIP(`src/export/zip.ts`), 디버그 그래프·녹화·재생 작성, 단위 테스트 통과. 헤드리스 촬영 흐름 확인은 아직.
+  - Phase 2 코어(`src/sync/drive.ts, queue.ts, token.ts, names.ts` + 테스트 74개) 완성. 화면 연결(`src/sync/index.ts`, 온보딩·불러오기)은 자리표시.
+  - Phase 3: crop/finger/enhance 코어 작성. dewarp(자리표시: 항상 건너뜀)·OCR·PDF·runner·화면은 아직.
+  - 합성 테스트 데이터 생성기 `tests/synthetic/*.ts` 와 `tests/fixtures/synthetic/*` 생성됨.
+- 2026-11-25 Orca 재시작으로 세션이 한 번 끊겼다. 커밋 안 된 변경은 작업 폴더에 그대로 남아 있었다 → 그 뒤 Phase 1 을 먼저 커밋해 진행분을 지킨다.
+
+### Phase 0 기록
+
+- **Phase 0 구현 완료.**
 - 저장소: https://github.com/jju1512/bookscan (공개, 기본 브랜치 `main`), 로컬 `C:\jju_make\bookscan`.
 - 배포: https://jju1512.github.io/bookscan/ — GitHub Actions(`.github/workflows/pages.yml`)로 main push 때 자동 배포. Pages 는 `build_type: workflow` 로 켰다.
   - 첫 배포(2026-11-25, 커밋 `298d776`, [실행 45551414790](https://github.com/jju1512/bookscan/actions/runs/45551414790)) 성공. 사이트·`manifest.webmanifest`·`sw.js`·아이콘 모두 200, 경로는 `/bookscan/`, manifest `start_url`·`scope` 도 `/bookscan/`. 헤드리스 크롬 가짜 카메라로 배포 주소에서 미리보기와 해상도 표시를 확인했다.

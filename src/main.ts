@@ -2,10 +2,12 @@ import './app/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { startApp } from './app/app';
 import { initParams } from './config';
+import { initSettings } from './config/settings';
 import { captureGlobalErrors, log } from './debug/log';
 
 captureGlobalErrors();
 initParams();
+initSettings();
 log.info(`북스캔 ${__APP_VERSION__} 시작`);
 
 const root = document.getElementById('app');
