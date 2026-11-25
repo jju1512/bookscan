@@ -57,9 +57,31 @@ npm run preview      # http://localhost:4173  (빌드 결과, 서비스 워커 �
   (Git Bash 에서는 `/bookscan/` 이 Windows 경로로 바뀌므로 `MSYS_NO_PATHCONV=1 BASE_PATH=/bookscan/ npm run build`)
 - 출처(origin)는 `https://jju1512.github.io` 다. 같은 계정의 다른 Pages 사이트와 브라우저 저장소(IndexedDB·OPFS·localStorage)의 출처를 함께 쓰므로 키 이름을 `bookscan.*` 으로 구분한다. Phase 2 OAuth "승인된 JavaScript 원본"도 이 값이다.
 
-## 구글 설정
+## 구글 설정 (드라이브 백업, Phase 2)
 
-Phase 2에서 쓴다. OAuth 웹 클라이언트 ID 를 빌드 시 `VITE_GOOGLE_CLIENT_ID` 로 넣는다(클라이언트 시크릿은 쓰지 않는다). 절차는 Phase 2 때 이 절에 적는다.
+클라이언트 ID 가 없으면 앱은 드라이브 기능을 "설정 필요"로 숨기고 나머지(촬영·저장·ZIP·후처리)는 그대로 동작한다.
+
+1. https://console.cloud.google.com/ 에서 프로젝트를 만든다 (예: `bookscan`).
+2. **API 및 서비스 → 라이브러리 → Google Drive API → 사용**.
+3. **OAuth 동의 화면**(Google Auth Platform → 브랜딩/대상): 사용자 유형 "외부", 앱 이름·지원 이메일 입력.
+   - 범위(데이터 액세스)에 `https://www.googleapis.com/auth/drive.file` 하나만 추가한다.
+   - 게시 상태가 "테스트"이면 **테스트 사용자**에 본인 구글 계정을 넣어야 로그인된다. 공개 배포 전에는 게시 상태와 검증 필요 여부를 확인한다 (drive.file 은 민감하지 않은 범위라 보통 검증이 가볍다).
+4. **사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID → 웹 애플리케이션**.
+   - **승인된 JavaScript 원본**: `https://jju1512.github.io` 와 `http://localhost:5173` (경로 없이, 끝에 `/` 없이).
+   - 리디렉션 URI 는 비워 둔다 (토큰 모델 팝업이라 필요 없다). 클라이언트 **시크릿은 쓰지 않는다**.
+5. 발급된 클라이언트 ID(`…apps.googleusercontent.com`)를 GitHub 저장소 **변수**로 넣는다 (공개값이라 secret 이 아니다):
+   - 저장소 → Settings → Secrets and variables → Actions → **Variables** 탭 → New repository variable
+   - 이름 `VITE_GOOGLE_CLIENT_ID`, 값 = 클라이언트 ID
+   - 또는 `gh variable set VITE_GOOGLE_CLIENT_ID -R jju1512/bookscan --body "<클라이언트 ID>"`
+6. Actions 에서 `pages` 워크플로를 다시 실행(또는 main 에 push)하면 드라이브 기능이 켜진 빌드가 배포된다.
+7. 로컬 개발: `VITE_GOOGLE_CLIENT_ID=<ID> npm run dev` (PowerShell: `$env:VITE_GOOGLE_CLIENT_ID="<ID>"; npm run dev`). 값을 파일로 두려면 커밋하지 않는 `.env.local` 에 둔다.
+
+동작 요약 (SPEC 7장)
+- 토큰은 메모리에만 둔다. 앱을 다시 열면 첫 업로드 때 팝업 없는 재발급을 시도하고, 안 되면 상단에 **드라이브 다시 연결** 버튼이 뜬다. 그동안 업로드는 대기, 촬영은 계속된다.
+- 드라이브 구조: `내 드라이브/BookScan/<책 제목>_<YYYYMMDD>/original/0001.jpg …`, `book.json`, `<책 제목>.pdf`.
+- 업로드 대기열: 동시 2개, 실패 시 2·4·8초… 최대 5분 간격으로 재시도, 오프라인이면 멈췄다가 온라인이 되면 이어서. 5MB 이하는 multipart, 큰 파일(PDF)은 resumable. 재시도 전에는 같은 이름 파일이 이미 있는지 확인해 두 번 올리지 않는다.
+- book.json 은 촬영 업로드가 끝나면(그리고 책이 바뀌면) 올라간다. 다른 기기(PC)에서 **드라이브에서 불러오기**로 이 파일을 찾아 책을 받는다. drive.file 범위라 이 앱이 만든 파일만 보인다.
+- 연동 해제: 토큰을 폐기(revoke)하고 대기열을 멈춘다. 로컬 데이터와 드라이브 파일은 그대로 둔다.
 
 ## 폴더 구조
 
